@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Canvas 图片上传</title>
+</head>
+
+<body>
+  <canvas id="canvas1"></canvas>
+  <input type="file" id="fileInput1" accept="image/*">
+  <div>
+    <button onclick="canvasIdft();">←<br />IDFT</button>
+    <button onclick="canvasDft();">→<br />DFT</button>
+  </div>
+  <div>
+    <canvas id="canvas2"></canvas>
+    <input type="file" id="fileInput2" accept="image/*">
+    <canvas id="canvas3"></canvas>
+    <input type="file" id="fileInput3" accept="image/*">
+  </div>
+</body>
+
+<style>
+  body {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    column-gap: 1rem;
+    margin: 0;
+    padding: 1rem;
+  }
+
+  body>canvas {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0;
+    max-width: 50%;
+  }
+
+  body>div:has(canvas) {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0;
+    max-width: 50%;
+    display: flex;
+    flex-direction: column;
+    row-gap: 1rem;
+    align-items: stretch;
+  }
+
+  input {
+    display: none;
+  }
+
+  canvas {
+    border: 1px solid #f0f0f0;
+    width: min-content;
+  }
+
+  #canvas2,
+  #canvas3 {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  canvas:hover {
+    background-color: #f0f0f0;
+    border: 1px solid #c0c0c0;
+    opacity: 0.8;
+  }
+
+  canvas:active {
+    background-color: #f0f0f0;
+    border: 1px solid #c0c0c0;
+    opacity: 1;
+  }
+
+  body>div:has(button) {
+    display: flex;
+    column-gap: 0.5rem;
+    align-items: center;
+  }
+
+  body>div button {
+    width: 100%;
+  }
+</style>
+
+<script src="https://docs.opencv.org/3.4/opencv.js"></script>
+<script>
+  const canvas1 = document.querySelector('#canvas1');
+  const canvas2 = document.querySelector('#canvas2');
+  const canvas3 = document.querySelector('#canvas3');
+  const fileInput1 = document.querySelector('#fileInput1');
+  const fileInput2 = document.querySelector('#fileInput2');
+  const fileInput3 = document.querySelector('#fileInput3');
+  const ctx1 = canvas1.getContext('2d');
+  const ctx2 = canvas2.getContext('2d');
+  const ctx3 = canvas3.getContext('2d');
+
+  canvas1.addEventListener('click', () => {
+    fileInput1.click();
+  });
+  canvas2.addEventListener('click', () => {
+    fileInput2.click();
+  });
+  canvas3.addEventListener('click', () => {
+    fileInput3.click();
+  });
+
+  fileInput1.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) {
+      const img = new Image();
+      img.onload = () => {
+        canvas1.width = img.width;
+        canvas1.height = img.height;
+        ctx1.drawImage(img, 0, 0);
+      };
+      img.src = URL.createObjectURL(file);
+    }
+  });
+  fileInput2.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) {
+      const img = new Image();
+      img.onload = () => {
+        canvas2.width = img.width;
+        canvas2.height = img.height;
+        ctx2.drawImage(img, 0, 0);
+      };
+      img.src = URL.createObjectURL(file);
+    }
+  });
+  fileInput3.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) {
+      const img = new Image();
+      img.onload = () => {
+        canvas3.width = img.width;
+        canvas3.height = img.height;
+        ctx3.drawImage(img, 0, 0);
+      };
+      img.src = URL.createObjectURL(file);
+    }
+  });
+
+  Object.defineProperty(canvas1, 'imageData', {
+    get: function () {
+      return this.getContext('2d').getImageData(0, 0, this.width, this.height);
+    }
+  });
+  Object.defineProperty(canvas2, 'imageData', {
+    get: function () {
+      return this.getContext('2d').getImageData(0, 0, this.width, this.height);
+    }
+  });
+  Object.defineProperty(canvas3, 'imageData', {
+    get: function () {
+      return this.getContext('2d').getImageData(0, 0, this.width, this.height);
+    }
+  });
+
+
+
+  // DFT
+
+  function canvasDft() {
+    const imageData = canvas1.imageData;
+    const { magnitudeImageData, phaseImageData } = imageDataDft(imageData);
+    canvas2.width = magnitudeImageData.width;
+    canvas2.height = magnitudeImageData.height;
+    ctx2.putImageData(magnitudeImageData, 0, 0);
+    canvas3.width = phaseImageData.width;
+    canvas3.height = phaseImageData.height;
+    ctx3.putImageData(phaseImageData, 0, 0);
+  }
+
+  function imageDataDft(imageData) {
+    const { width, height, data } = imageData;
+    // 转换为mat
+    let src = cv.matFromImageData(imageData);
+
+    // 转换为灰度图像
+    let gray = new cv.Mat();
+    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+
+    // 转换为浮点数
+    let floatMat = new cv.Mat();
+    gray.convertTo(floatMat, cv.CV_32F);
+
+    // dft
+    let planes = new cv.MatVector();
+    let complex = new cv.Mat();
+    let zeros = new cv.Mat.zeros(height, width, cv.CV_32F);
+    planes.push_back(floatMat);
+    planes.push_back(zeros);
+    cv.merge(planes, complex);
+
+    cv.dft(complex, complex, cv.DFT_COMPLEX_OUTPUT);
+
+    // 计算幅度谱和相位谱
+    const splitPlanes = new cv.MatVector();
+    cv.split(complex, splitPlanes);
+    let mag = new cv.Mat();
+    let phase = new cv.Mat(height, width, cv.CV_32F);
+    const realMat = splitPlanes.get(0);
+    const imagMat = splitPlanes.get(1);
+    cv.magnitude(realMat, imagMat, mag); // 幅度(模长)
+    for (let y = 0; y < height; y++) { // 相位
+      for (let x = 0; x < width; x++) {
+        let real = realMat.floatPtr(y, x)[0];
+        let imag = imagMat.floatPtr(y, x)[0];
+        phase.floatPtr(y, x)[0] = Math.atan2(imag, real);
+      }
+    }
+
+    console.log("mag 最大值:", cv.minMaxLoc(mag).maxVal);
+    console.log("phase 最大值:", cv.minMaxLoc(phase).maxVal);
+
+    // 对数变换 log(n+1)
+    cv.add(mag, new cv.Mat.ones(height, width, cv.CV_32F), mag);
+    cv.log(mag, mag);
+
+    console.log("mag 最大值:", cv.minMaxLoc(mag).maxVal);
+    console.log("phase 最大值:", cv.minMaxLoc(phase).maxVal);
+
+    // 归一化到0~255
+    cv.normalize(mag, mag, 0, 255, cv.NORM_MINMAX);
+    mag.convertTo(mag, cv.CV_8U);
+    cv.normalize(phase, phase, 0, 255, cv.NORM_MINMAX);
+    phase.convertTo(phase, cv.CV_8U);
+
+    console.log("mag 最大值:", cv.minMaxLoc(mag).maxVal);
+    console.log("phase 最大值:", cv.minMaxLoc(phase).maxVal);
+
+    // 交换象限
+    quadrantSwap(mag);
+    quadrantSwap(phase);
+
+    // 转换回imageData
+    const magnitudeImageData = matToImageDataDirect(mag);
+    const phaseImageData = matToImageDataDirect(phase);
+
+    return { magnitudeImageData, phaseImageData };
+  }
+
+
+
+  // IDFT
+
+  function canvasIdft() {
+    const magnitudeImageData = canvas2.imageData;
+    const phaseImageData = canvas3.imageData;
+    const imageData = imageDataIdft({ magnitudeImageData: magnitudeImageData, phaseImageData: phaseImageData });
+    canvas1.width = imageData.width;
+    canvas1.height = imageData.height;
+    ctx1.putImageData(imageData, 0, 0);
+  }
+
+  function imageDataIdft({ magnitudeImageData, phaseImageData }) {
+    if (magnitudeImageData.width !== phaseImageData.width) return;
+    if (magnitudeImageData.height !== phaseImageData.height) return;
+    const { width, height } = magnitudeImageData;
+
+    // 转换为 Mat
+    let mag = cv.matFromImageData(magnitudeImageData);
+    let phase = cv.matFromImageData(phaseImageData);
+
+    // 转换为灰度
+    cv.cvtColor(mag, mag, cv.COLOR_RGBA2GRAY);
+    cv.cvtColor(phase, phase, cv.COLOR_RGBA2GRAY);
+
+    console.log("mag 最大值:", cv.minMaxLoc(mag).maxVal);
+    console.log("phase 最大值:", cv.minMaxLoc(phase).maxVal);
+
+    // 逆归一化
+    cv.normalize(mag, mag, 0, 20, cv.NORM_MINMAX, cv.CV_32F);
+    cv.normalize(phase, phase, -Math.PI, Math.PI, cv.NORM_MINMAX, cv.CV_32F);
+
+    console.log("mag 最大值:", cv.minMaxLoc(mag).maxVal);
+    console.log("phase 最大值:", cv.minMaxLoc(phase).maxVal);
+
+    // 逆对数变换 e^n-1
+    cv.exp(mag, mag);
+    cv.subtract(mag, new cv.Mat.ones(height, width, cv.CV_32F), mag);
+
+    console.log("mag 最大值:", cv.minMaxLoc(mag).maxVal);
+    console.log("phase 最大值:", cv.minMaxLoc(phase).maxVal);
+
+    // 交换象限回到原始位置
+    quadrantSwap(mag);
+    quadrantSwap(phase);
+
+    // 计算实部和虚部
+    let real = new cv.Mat(height, width, cv.CV_32F);
+    let imag = new cv.Mat(height, width, cv.CV_32F);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let magnitude = mag.floatPtr(y, x)[0];
+        let angle = phase.floatPtr(y, x)[0];
+        real.floatPtr(y, x)[0] = magnitude * Math.cos(angle);
+        imag.floatPtr(y, x)[0] = magnitude * Math.sin(angle);
+      }
+    }
+
+    // 合并为复数矩阵
+    let planes = new cv.MatVector();
+    planes.push_back(real);
+    planes.push_back(imag);
+    let complex = new cv.Mat();
+    cv.merge(planes, complex);
+
+    // 计算逆DFT
+    let idft = new cv.Mat();
+    cv.dft(complex, idft, cv.DFT_INVERSE | cv.DFT_REAL_OUTPUT | cv.DFT_SCALE);
+
+    // 归一化到0~255
+    cv.normalize(idft, idft, 0, 255, cv.NORM_MINMAX);
+    idft.convertTo(idft, cv.CV_8U);
+
+    // 转换回 imageData
+    const imageData = matToImageDataDirect(idft);
+
+    return imageData;
+  }
+
+
+  function quadrantSwap(mat) {
+    let cx = Math.floor(mat.cols / 2);
+    let cy = Math.floor(mat.rows / 2);
+
+    let q0 = mat.roi(new cv.Rect(0, 0, cx, cy));         // 左上
+    let q1 = mat.roi(new cv.Rect(cx, 0, cx, cy));        // 右上
+    let q2 = mat.roi(new cv.Rect(0, cy, cx, cy));        // 左下
+    let q3 = mat.roi(new cv.Rect(cx, cy, cx, cy));       // 右下
+
+    let tmp = new cv.Mat();
+
+    // 交换左上和右下
+    q0.copyTo(tmp);
+    q3.copyTo(q0);
+    tmp.copyTo(q3);
+
+    // 交换右上和左下
+    q1.copyTo(tmp);
+    q2.copyTo(q1);
+    tmp.copyTo(q2);
+  }
+
+  function matToImageDataDirect(mat) {
+    let imageData = new ImageData(mat.cols, mat.rows);
+    let data = imageData.data;
+    let matData = mat.data;
+
+    let channels = mat.channels(); // 获取通道数（1 = 灰度，3 = BGR，4 = BGRA）
+    let index = 0;
+
+    for (let i = 0; i < matData.length; i += channels) {
+      if (channels === 1) {
+        // 灰度图：R = G = B = 灰度值
+        let gray = matData[i];
+        data[index] = gray; // R
+        data[index + 1] = gray; // G
+        data[index + 2] = gray; // B
+        data[index + 3] = 255; // A（不透明）
+      } else {
+        // 彩色或带透明通道的图像
+        data[index] = matData[i]; // R
+        data[index + 1] = matData[i + 1] || matData[i]; // G
+        data[index + 2] = matData[i + 2] || matData[i]; // B
+        data[index + 3] = channels === 4 ? matData[i + 3] : 255; // A（如果 Mat 里没有 alpha 通道，就填充 255）
+      }
+      index += 4;
+    }
+
+    return imageData;
+  }
+
+</script>
+
+</html>

@@ -145,7 +145,8 @@
 
     let matVector_mag = new cv.MatVector();
     let matVector_phase = new cv.MatVector();
-    for (let i = 0; i < matVector_input.size(); i++) { // 对每个通道分别进行 DFT
+    // for (let i = 0; i < matVector_input.size(); i++) { // 对每个通道分别进行 DFT
+    for (let i = 0; i < 1; i++) { // 对R通道分别进行 DFT
       // 转换为浮点数
       let mat_inputFloat = new cv.Mat();
       matVector_input.get(i).convertTo(mat_inputFloat, cv.CV_32F);
@@ -184,8 +185,8 @@
       mat_phase = symmetrize(mat_phase, true); // 反对称化相位谱
 
       // 交换象限
-      quadrantSwap(mat_mag);
-      quadrantSwap(mat_phase);
+      // quadrantSwap(mat_mag);
+      // quadrantSwap(mat_phase);
 
       console.log(`mag: ${cv.minMaxLoc(mat_mag).minVal}~${cv.minMaxLoc(mat_mag).maxVal}`);
       console.log(`phase: ${cv.minMaxLoc(mat_phase).minVal}~${cv.minMaxLoc(mat_phase).maxVal}`);
@@ -197,22 +198,26 @@
       console.log(`mag: ${cv.minMaxLoc(mat_mag).minVal}~${cv.minMaxLoc(mat_mag).maxVal}`);
       console.log(`phase: ${cv.minMaxLoc(mat_phase).minVal}~${cv.minMaxLoc(mat_phase).maxVal}`);
 
+      // 归一化到0~255
+      // cv.normalize(mat_mag, mat_mag, 0, 255, cv.NORM_MINMAX);
+      // mat_mag.convertTo(mat_mag, cv.CV_8U);
+      // cv.normalize(mat_phase, mat_phase, 0, 255, cv.NORM_MINMAX);
+      // mat_phase.convertTo(mat_phase, cv.CV_8U);
+
       // mag 归一化到 0~255，使用 0~Math.log(2**32) ≈ 0~22.18
-      let mag_scale = 255.0 / Math.log(Math.pow(2, 32));
+      let mag_scale = 255 / Math.log(width * height * 255 + 1);
       cv.multiply(mat_mag, new cv.Mat(height, width, cv.CV_32F, new cv.Scalar(mag_scale)), mat_mag);
       cv.threshold(mat_mag, mat_mag, 255, 255, cv.THRESH_TRUNC); // clip 超过 255 的部分
       mat_mag.convertTo(mat_mag, cv.CV_8U);
 
       // phase 归一化到 0~255，原始范围为 -pi ~ pi
-      let phase_shift = Math.PI; // 把 -pi~pi 映射到 0~2pi
-      let phase_scale = 255.0 / (2 * Math.PI);
-      cv.add(mat_phase, new cv.Mat(height, width, cv.CV_32F, new cv.Scalar(phase_shift)), mat_phase);
-      cv.multiply(mat_phase, new cv.Mat(height, width, cv.CV_32F, new cv.Scalar(phase_scale)), mat_phase);
+      cv.add(mat_phase, new cv.Mat(height, width, cv.CV_32F, new cv.Scalar(Math.PI)), mat_phase);
+      cv.multiply(mat_phase, new cv.Mat(height, width, cv.CV_32F, new cv.Scalar(255.0 / (2 * Math.PI))), mat_phase);
       cv.threshold(mat_phase, mat_phase, 255, 255, cv.THRESH_TRUNC);
       mat_phase.convertTo(mat_phase, cv.CV_8U);
 
       // downloadMatAsImage(mat_mag, "mat_mag.png")
-      downloadMatAsImage(mat_phase, "mat_phase.png")
+      // downloadMatAsImage(mat_phase, "mat_phase.png")
       console.log(`mag: ${cv.minMaxLoc(mat_mag).minVal}~${cv.minMaxLoc(mat_mag).maxVal}`);
       console.log(`phase: ${cv.minMaxLoc(mat_phase).minVal}~${cv.minMaxLoc(mat_phase).maxVal}`);
 
@@ -237,25 +242,17 @@
     cv.merge(matVector_mag, mat_magRGB); // 合并幅度谱
     cv.merge(matVector_phase, mat_phaseRGB); // 合并相位谱
 
-    // 裁剪 mag phase 左半
-    const half = Math.floor(width / 2);
-    const evenHeight = height - height % 2;
-    let mat_magRGBHalf = mat_magRGB.roi(new cv.Rect(0, 0, half, evenHeight));
-    let mat_phaseRGBHalf = mat_phaseRGB.roi(new cv.Rect(0, 0, half, evenHeight)).clone();
-
-    // phase单纯对称, 注意不是反对称
-    cv.flip(mat_phaseRGBHalf, mat_phaseRGBHalf, -1);
-
     // 拼接图像
     let matVector_Half = new cv.MatVector();
-    matVector_Half.push_back(mat_magRGBHalf);
-    matVector_Half.push_back(mat_phaseRGBHalf);
+    matVector_Half.push_back(mat_magRGB);
+    matVector_Half.push_back(mat_phaseRGB);
 
     let mat_output = new cv.Mat();
     cv.hconcat(matVector_Half, mat_output);
 
     // 转换回imageData
     const imageData_output = mat2imageData(mat_output);
+
 
     mat_input.delete();
     mat_inputRGB.delete();
@@ -264,8 +261,6 @@
     matVector_phase.delete();
     mat_magRGB.delete();
     mat_phaseRGB.delete();
-    mat_magRGBHalf.delete();
-    mat_phaseRGBHalf.delete();
     matVector_Half.delete();
     mat_output.delete();
 
@@ -277,7 +272,7 @@
   // IDFT
 
   function imageDataIdft(imageData) {
-    const { width, height } = imageData;
+    const { width: totalWidth, height } = imageData;
 
     // 转换为 Mat
     let mat_input = cv.matFromImageData(imageData);
@@ -291,57 +286,35 @@
     cv.split(mat_inputRGB, matVector_input);
 
     let matVector_output = new cv.MatVector();
-    for (let i = 0; i < matVector_input.size(); i++) { // 对每个通道分别进行 DFT
+    // for (let i = 0; i < matVector_input.size(); i++) { // 对每个通道分别进行 IDFT
+    for (let i = 0; i < 1; i++) { // 对R通道分别进行 IDFT
       let mat_input = new cv.Mat();
-      matVector_input.get(i).convertTo(mat_input, cv.CV_8U);
+      matVector_input.get(i).convertTo(mat_input, cv.CV_32F);
 
       // 提取 mag phase
-      const half = Math.floor(width / 2);
+      const width = Math.floor(totalWidth / 2);
 
-      let mat_magHalf = mat_input.roi(new cv.Rect(0, 0, half, height)).clone();
-      let mat_phaseHalf = mat_input.roi(new cv.Rect(half, 0, half, height)).clone();
-
-      // phase单纯对称, 注意不是反对称
-      cv.flip(mat_phaseHalf, mat_phaseHalf, -1);
-
-      let mat_magHalfFlip = mat_magHalf.roi(new cv.Rect(0, 0, half, height)).clone();
-      cv.flip(mat_magHalfFlip, mat_magHalfFlip, -1);
-
-      let mat_phaseHalfFlip = mat_phaseHalf.roi(new cv.Rect(0, 0, half, height)).clone();
-      cv.flip(mat_phaseHalfFlip, mat_phaseHalfFlip, -1);
-
-      let scalar255 = new cv.Mat(height, half, cv.CV_8U, new cv.Scalar(255));
-      cv.subtract(scalar255, mat_phaseHalfFlip, mat_phaseHalfFlip);
-
-      let matVector_mag = new cv.MatVector();
-      let matVector_phase = new cv.MatVector();
-
-      matVector_mag.push_back(mat_magHalf);
-      matVector_mag.push_back(mat_magHalfFlip);
-      matVector_phase.push_back(mat_phaseHalf);
-      matVector_phase.push_back(mat_phaseHalfFlip);
-
-      let mat_mag = new cv.Mat();
-      let mat_phase = new cv.Mat();
-      cv.hconcat(matVector_mag, mat_mag);
-      cv.hconcat(matVector_phase, mat_phase);
+      let mat_mag = mat_input.roi(new cv.Rect(0, 0, width, height)).clone();
+      let mat_phase = mat_input.roi(new cv.Rect(width, 0, width, height)).clone();
 
       console.log(`mag: ${cv.minMaxLoc(mat_mag).minVal}~${cv.minMaxLoc(mat_mag).maxVal}`);
       console.log(`phase: ${cv.minMaxLoc(mat_phase).minVal}~${cv.minMaxLoc(mat_phase).maxVal}`);
       // downloadMatAsImage(mat_mag, "mat_mag2.png")
-      downloadMatAsImage(mat_phase, "mat_phase2.png")
+      // downloadMatAsImage(mat_phase, "mat_phase2.png")
 
       // mag 逆归一化
       mat_mag.convertTo(mat_mag, cv.CV_32F);
-      let mag_scaleInv = Math.log(Math.pow(2, 32)) / 255.0;
+      let mag_scaleInv = Math.log(width * height * 255 + 1) / 255;
       cv.multiply(mat_mag, new cv.Mat(height, width, cv.CV_32F, new cv.Scalar(mag_scaleInv)), mat_mag);
 
       // phase 逆归一化
       mat_phase.convertTo(mat_phase, cv.CV_32F);
-      let phase_shift = Math.PI;
-      let phase_scaleInv = (2 * Math.PI) / 255.0;
-      cv.multiply(mat_phase, new cv.Mat(height, width, cv.CV_32F, new cv.Scalar(phase_scaleInv)), mat_phase);
-      cv.subtract(mat_phase, new cv.Mat(height, width, cv.CV_32F, new cv.Scalar(phase_shift)), mat_phase);
+      cv.multiply(mat_phase, new cv.Mat(height, width, cv.CV_32F, new cv.Scalar((2 * Math.PI) / 255.0)), mat_phase);
+      cv.subtract(mat_phase, new cv.Mat(height, width, cv.CV_32F, new cv.Scalar(Math.PI)), mat_phase);
+
+      // 逆归一化
+      // cv.normalize(mat_mag, mat_mag, 0, 20, cv.NORM_MINMAX, cv.CV_32F);
+      // cv.normalize(mat_phase, mat_phase, -Math.PI, Math.PI, cv.NORM_MINMAX, cv.CV_32F);
 
       console.log(`mag: ${cv.minMaxLoc(mat_mag).minVal}~${cv.minMaxLoc(mat_mag).maxVal}`);
       console.log(`phase: ${cv.minMaxLoc(mat_phase).minVal}~${cv.minMaxLoc(mat_phase).maxVal}`);
@@ -354,8 +327,8 @@
       console.log(`phase: ${cv.minMaxLoc(mat_phase).minVal}~${cv.minMaxLoc(mat_phase).maxVal}`);
 
       // 交换象限
-      quadrantSwap(mat_mag);
-      quadrantSwap(mat_phase);
+      // quadrantSwap(mat_mag);
+      // quadrantSwap(mat_phase);
 
       // 计算实部和虚部
       let real = new cv.Mat(height, width, cv.CV_32F);
@@ -387,12 +360,9 @@
       // 将通道合并
       matVector_output.push_back(idft);
 
-      scalar255.delete();
       mat_input.delete();
       mat_mag.delete();
-      mat_magHalf.delete();
       mat_phase.delete();
-      mat_phaseHalf.delete();
       real.delete();
       imag.delete();
       planes.delete();

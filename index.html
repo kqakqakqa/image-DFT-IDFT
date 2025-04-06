@@ -14,12 +14,8 @@
     <button onclick="canvasIdft();">←<br />IDFT</button>
     <button onclick="canvasDft();">→<br />DFT</button>
   </div>
-  <div>
-    <canvas id="canvas2"></canvas>
-    <input type="file" id="fileInput2" accept="image/*">
-    <canvas id="canvas3"></canvas>
-    <input type="file" id="fileInput3" accept="image/*">
-  </div>
+  <canvas id="canvas2"></canvas>
+  <input type="file" id="fileInput2" accept="image/*">
 </body>
 
 <style>
@@ -34,37 +30,28 @@
     padding: 1rem;
   }
 
-  body>canvas {
-    flex-grow: 1;
-    flex-shrink: 1;
-    flex-basis: 0;
-    max-width: 50%;
-  }
-
-  body>div:has(canvas) {
-    flex-grow: 1;
-    flex-shrink: 1;
-    flex-basis: 0;
-    max-width: 50%;
-    display: flex;
-    flex-direction: column;
-    row-gap: 1rem;
-    align-items: stretch;
-  }
-
   input {
     display: none;
+  }
+
+  body>div:has(button) {
+    display: flex;
+    column-gap: 0.5rem;
+    align-items: center;
+  }
+
+  body>div button {
+    width: 100%;
   }
 
   canvas {
     border: 1px solid #f0f0f0;
     width: min-content;
-  }
 
-  #canvas2,
-  #canvas3 {
-    width: 100%;
-    max-width: 100%;
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0;
+    max-width: 50%;
   }
 
   canvas:hover {
@@ -78,38 +65,23 @@
     border: 1px solid #c0c0c0;
     opacity: 1;
   }
-
-  body>div:has(button) {
-    display: flex;
-    column-gap: 0.5rem;
-    align-items: center;
-  }
-
-  body>div button {
-    width: 100%;
-  }
 </style>
 
 <script src="https://docs.opencv.org/3.4/opencv.js"></script>
 <script>
   const canvas1 = document.querySelector('#canvas1');
   const canvas2 = document.querySelector('#canvas2');
-  const canvas3 = document.querySelector('#canvas3');
   const fileInput1 = document.querySelector('#fileInput1');
   const fileInput2 = document.querySelector('#fileInput2');
-  const fileInput3 = document.querySelector('#fileInput3');
   const ctx1 = canvas1.getContext('2d');
   const ctx2 = canvas2.getContext('2d');
-  const ctx3 = canvas3.getContext('2d');
+
 
   canvas1.addEventListener('click', () => {
     fileInput1.click();
   });
   canvas2.addEventListener('click', () => {
     fileInput2.click();
-  });
-  canvas3.addEventListener('click', () => {
-    fileInput3.click();
   });
 
   fileInput1.addEventListener('change', e => {
@@ -136,197 +108,311 @@
       img.src = URL.createObjectURL(file);
     }
   });
-  fileInput3.addEventListener('change', e => {
-    const file = e.target.files[0];
-    if (file) {
-      const img = new Image();
-      img.onload = () => {
-        canvas3.width = img.width;
-        canvas3.height = img.height;
-        ctx3.drawImage(img, 0, 0);
-      };
-      img.src = URL.createObjectURL(file);
-    }
-  });
-
-  Object.defineProperty(canvas1, 'imageData', {
-    get: function () {
-      return this.getContext('2d').getImageData(0, 0, this.width, this.height);
-    }
-  });
-  Object.defineProperty(canvas2, 'imageData', {
-    get: function () {
-      return this.getContext('2d').getImageData(0, 0, this.width, this.height);
-    }
-  });
-  Object.defineProperty(canvas3, 'imageData', {
-    get: function () {
-      return this.getContext('2d').getImageData(0, 0, this.width, this.height);
-    }
-  });
 
 
+
+  function canvasDft() {
+    const imageData = ctx1.getImageData(0, 0, canvas1.width, canvas1.height);
+    const imageData2 = imageDataDft(imageData);
+    canvas2.width = imageData2.width;
+    canvas2.height = imageData2.height;
+    ctx2.putImageData(imageData2, 0, 0);
+  }
+
+  function canvasIdft() {
+    const imageData2 = ctx2.getImageData(0, 0, canvas2.width, canvas2.height);
+    const imageData = imageDataIdft(imageData2);
+    canvas1.width = imageData.width;
+    canvas1.height = imageData.height;
+    ctx1.putImageData(imageData, 0, 0);
+  }
 
   // DFT
 
-  function canvasDft() {
-    const imageData = canvas1.imageData;
-    const { magnitudeImageData, phaseImageData } = imageDataDft(imageData);
-    canvas2.width = magnitudeImageData.width;
-    canvas2.height = magnitudeImageData.height;
-    ctx2.putImageData(magnitudeImageData, 0, 0);
-    canvas3.width = phaseImageData.width;
-    canvas3.height = phaseImageData.height;
-    ctx3.putImageData(phaseImageData, 0, 0);
-  }
-
   function imageDataDft(imageData) {
-    const { width, height, data } = imageData;
-    // 转换为mat
-    let src = cv.matFromImageData(imageData);
+    const { width, height } = imageData;
 
-    // 转换为灰度图像
-    let gray = new cv.Mat();
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+    // 转换为 Mat
+    let mat_input = cv.matFromImageData(imageData);
 
-    // 转换为浮点数
-    let floatMat = new cv.Mat();
-    gray.convertTo(floatMat, cv.CV_32F);
+    // 将 RGBA 转为 RGB
+    let mat_inputRGB = new cv.Mat();
+    cv.cvtColor(mat_input, mat_inputRGB, cv.COLOR_RGBA2RGB);
 
-    // dft
-    let planes = new cv.MatVector();
-    let complex = new cv.Mat();
-    let zeros = new cv.Mat.zeros(height, width, cv.CV_32F);
-    planes.push_back(floatMat);
-    planes.push_back(zeros);
-    cv.merge(planes, complex);
+    // 分离 RGB 通道
+    let matVector_input = new cv.MatVector();
+    cv.split(mat_inputRGB, matVector_input);
 
-    cv.dft(complex, complex, cv.DFT_COMPLEX_OUTPUT);
+    let matVector_mag = new cv.MatVector();
+    let matVector_phase = new cv.MatVector();
+    for (let i = 0; i < matVector_input.size(); i++) { // 对每个通道分别进行 DFT
+      // 转换为浮点数
+      let mat_inputFloat = new cv.Mat();
+      matVector_input.get(i).convertTo(mat_inputFloat, cv.CV_32F);
 
-    // 计算幅度谱和相位谱
-    const splitPlanes = new cv.MatVector();
-    cv.split(complex, splitPlanes);
-    let mag = new cv.Mat();
-    let phase = new cv.Mat(height, width, cv.CV_32F);
-    const realMat = splitPlanes.get(0);
-    const imagMat = splitPlanes.get(1);
-    cv.magnitude(realMat, imagMat, mag); // 幅度(模长)
-    for (let y = 0; y < height; y++) { // 相位
-      for (let x = 0; x < width; x++) {
-        let real = realMat.floatPtr(y, x)[0];
-        let imag = imagMat.floatPtr(y, x)[0];
-        phase.floatPtr(y, x)[0] = Math.atan2(imag, real);
+      // dft
+      let matVector_complex = new cv.MatVector();
+      let mat_imag = new cv.Mat.zeros(height, width, cv.CV_32F);
+      matVector_complex.push_back(mat_inputFloat);
+      matVector_complex.push_back(mat_imag);
+
+      let mat_complex = new cv.Mat();
+      cv.merge(matVector_complex, mat_complex);
+
+      let mat_dftComplex = new cv.Mat();
+      cv.dft(mat_complex, mat_dftComplex, cv.DFT_COMPLEX_OUTPUT);
+
+      // 计算幅度谱和相位谱
+      let matVector_dftComplex = new cv.MatVector();
+      cv.split(mat_dftComplex, matVector_dftComplex);
+
+      let mat_dftReal = matVector_dftComplex.get(0);
+      let mat_dftImag = matVector_dftComplex.get(1);
+      let mat_mag = new cv.Mat();
+      let mat_phase = new cv.Mat(height, width, cv.CV_32F);
+      cv.magnitude(mat_dftReal, mat_dftImag, mat_mag); // 幅度(模长)
+      // cv.phase(mat_dftReal, mat_dftImag, mat_phase); // 相位 没有这个函数
+      for (let y = 0; y < height; y++) { // 相位
+        for (let x = 0; x < width; x++) {
+          let real = mat_dftReal.floatPtr(y, x)[0];
+          let imag = mat_dftImag.floatPtr(y, x)[0];
+          mat_phase.floatPtr(y, x)[0] = Math.atan2(imag, real);
+        }
       }
+
+      mat_mag = symmetrize(mat_mag); // 对称化幅度谱
+      mat_phase = symmetrize(mat_phase, true); // 反对称化相位谱
+
+      // 交换象限
+      quadrantSwap(mat_mag);
+      quadrantSwap(mat_phase);
+
+      console.log(`mag: ${cv.minMaxLoc(mat_mag).minVal}~${cv.minMaxLoc(mat_mag).maxVal}`);
+      console.log(`phase: ${cv.minMaxLoc(mat_phase).minVal}~${cv.minMaxLoc(mat_phase).maxVal}`);
+
+      // 对数变换 log(n+1)
+      cv.add(mat_mag, new cv.Mat.ones(height, width, cv.CV_32F), mat_mag);
+      cv.log(mat_mag, mat_mag);
+
+      console.log(`mag: ${cv.minMaxLoc(mat_mag).minVal}~${cv.minMaxLoc(mat_mag).maxVal}`);
+      console.log(`phase: ${cv.minMaxLoc(mat_phase).minVal}~${cv.minMaxLoc(mat_phase).maxVal}`);
+
+      // mag 归一化到 0~255，使用 0~Math.log(2**32) ≈ 0~22.18
+      let mag_scale = 255.0 / Math.log(Math.pow(2, 32));
+      cv.multiply(mat_mag, new cv.Mat(height, width, cv.CV_32F, new cv.Scalar(mag_scale)), mat_mag);
+      cv.threshold(mat_mag, mat_mag, 255, 255, cv.THRESH_TRUNC); // clip 超过 255 的部分
+      mat_mag.convertTo(mat_mag, cv.CV_8U);
+
+      // phase 归一化到 0~255，原始范围为 -pi ~ pi
+      let phase_shift = Math.PI; // 把 -pi~pi 映射到 0~2pi
+      let phase_scale = 255.0 / (2 * Math.PI);
+      cv.add(mat_phase, new cv.Mat(height, width, cv.CV_32F, new cv.Scalar(phase_shift)), mat_phase);
+      cv.multiply(mat_phase, new cv.Mat(height, width, cv.CV_32F, new cv.Scalar(phase_scale)), mat_phase);
+      cv.threshold(mat_phase, mat_phase, 255, 255, cv.THRESH_TRUNC);
+      mat_phase.convertTo(mat_phase, cv.CV_8U);
+
+      // downloadMatAsImage(mat_mag, "mat_mag.png")
+      downloadMatAsImage(mat_phase, "mat_phase.png")
+      console.log(`mag: ${cv.minMaxLoc(mat_mag).minVal}~${cv.minMaxLoc(mat_mag).maxVal}`);
+      console.log(`phase: ${cv.minMaxLoc(mat_phase).minVal}~${cv.minMaxLoc(mat_phase).maxVal}`);
+
+      // 将通道合并
+      matVector_mag.push_back(mat_mag);
+      matVector_phase.push_back(mat_phase);
+
+      mat_inputFloat.delete();
+      mat_imag.delete();
+      mat_complex.delete();
+      mat_dftComplex.delete();
+      matVector_complex.delete();
+      mat_dftReal.delete();
+      mat_dftImag.delete();
+      mat_mag.delete();
+      mat_phase.delete();
+      matVector_dftComplex.delete();
     }
 
-    console.log("mag 最大值:", cv.minMaxLoc(mag).maxVal);
-    console.log("phase 最大值:", cv.minMaxLoc(phase).maxVal);
+    let mat_magRGB = new cv.Mat();
+    let mat_phaseRGB = new cv.Mat();
+    cv.merge(matVector_mag, mat_magRGB); // 合并幅度谱
+    cv.merge(matVector_phase, mat_phaseRGB); // 合并相位谱
 
-    // 对数变换 log(n+1)
-    cv.add(mag, new cv.Mat.ones(height, width, cv.CV_32F), mag);
-    cv.log(mag, mag);
+    // 裁剪 mag phase 左半
+    const half = Math.floor(width / 2);
+    const evenHeight = height - height % 2;
+    let mat_magRGBHalf = mat_magRGB.roi(new cv.Rect(0, 0, half, evenHeight));
+    let mat_phaseRGBHalf = mat_phaseRGB.roi(new cv.Rect(0, 0, half, evenHeight)).clone();
 
-    console.log("mag 最大值:", cv.minMaxLoc(mag).maxVal);
-    console.log("phase 最大值:", cv.minMaxLoc(phase).maxVal);
+    // phase单纯对称, 注意不是反对称
+    cv.flip(mat_phaseRGBHalf, mat_phaseRGBHalf, -1);
 
-    // 归一化到0~255
-    cv.normalize(mag, mag, 0, 255, cv.NORM_MINMAX);
-    mag.convertTo(mag, cv.CV_8U);
-    cv.normalize(phase, phase, 0, 255, cv.NORM_MINMAX);
-    phase.convertTo(phase, cv.CV_8U);
+    // 拼接图像
+    let matVector_Half = new cv.MatVector();
+    matVector_Half.push_back(mat_magRGBHalf);
+    matVector_Half.push_back(mat_phaseRGBHalf);
 
-    console.log("mag 最大值:", cv.minMaxLoc(mag).maxVal);
-    console.log("phase 最大值:", cv.minMaxLoc(phase).maxVal);
-
-    // 交换象限
-    quadrantSwap(mag);
-    quadrantSwap(phase);
+    let mat_output = new cv.Mat();
+    cv.hconcat(matVector_Half, mat_output);
 
     // 转换回imageData
-    const magnitudeImageData = matToImageDataDirect(mag);
-    const phaseImageData = matToImageDataDirect(phase);
+    const imageData_output = mat2imageData(mat_output);
 
-    return { magnitudeImageData, phaseImageData };
+    mat_input.delete();
+    mat_inputRGB.delete();
+    matVector_input.delete();
+    matVector_mag.delete();
+    matVector_phase.delete();
+    mat_magRGB.delete();
+    mat_phaseRGB.delete();
+    mat_magRGBHalf.delete();
+    mat_phaseRGBHalf.delete();
+    matVector_Half.delete();
+    mat_output.delete();
+
+    return imageData_output;
   }
 
 
 
   // IDFT
 
-  function canvasIdft() {
-    const magnitudeImageData = canvas2.imageData;
-    const phaseImageData = canvas3.imageData;
-    const imageData = imageDataIdft({ magnitudeImageData: magnitudeImageData, phaseImageData: phaseImageData });
-    canvas1.width = imageData.width;
-    canvas1.height = imageData.height;
-    ctx1.putImageData(imageData, 0, 0);
-  }
-
-  function imageDataIdft({ magnitudeImageData, phaseImageData }) {
-    if (magnitudeImageData.width !== phaseImageData.width) return;
-    if (magnitudeImageData.height !== phaseImageData.height) return;
-    const { width, height } = magnitudeImageData;
+  function imageDataIdft(imageData) {
+    const { width, height } = imageData;
 
     // 转换为 Mat
-    let mag = cv.matFromImageData(magnitudeImageData);
-    let phase = cv.matFromImageData(phaseImageData);
+    let mat_input = cv.matFromImageData(imageData);
 
-    // 转换为灰度
-    cv.cvtColor(mag, mag, cv.COLOR_RGBA2GRAY);
-    cv.cvtColor(phase, phase, cv.COLOR_RGBA2GRAY);
+    // 将 RGBA 转为 RGB
+    let mat_inputRGB = new cv.Mat();
+    cv.cvtColor(mat_input, mat_inputRGB, cv.COLOR_RGBA2RGB);
 
-    console.log("mag 最大值:", cv.minMaxLoc(mag).maxVal);
-    console.log("phase 最大值:", cv.minMaxLoc(phase).maxVal);
+    // 分离 RGB 通道
+    let matVector_input = new cv.MatVector();
+    cv.split(mat_inputRGB, matVector_input);
 
-    // 逆归一化
-    cv.normalize(mag, mag, 0, 20, cv.NORM_MINMAX, cv.CV_32F);
-    cv.normalize(phase, phase, -Math.PI, Math.PI, cv.NORM_MINMAX, cv.CV_32F);
+    let matVector_output = new cv.MatVector();
+    for (let i = 0; i < matVector_input.size(); i++) { // 对每个通道分别进行 DFT
+      let mat_input = new cv.Mat();
+      matVector_input.get(i).convertTo(mat_input, cv.CV_8U);
 
-    console.log("mag 最大值:", cv.minMaxLoc(mag).maxVal);
-    console.log("phase 最大值:", cv.minMaxLoc(phase).maxVal);
+      // 提取 mag phase
+      const half = Math.floor(width / 2);
 
-    // 逆对数变换 e^n-1
-    cv.exp(mag, mag);
-    cv.subtract(mag, new cv.Mat.ones(height, width, cv.CV_32F), mag);
+      let mat_magHalf = mat_input.roi(new cv.Rect(0, 0, half, height)).clone();
+      let mat_phaseHalf = mat_input.roi(new cv.Rect(half, 0, half, height)).clone();
 
-    console.log("mag 最大值:", cv.minMaxLoc(mag).maxVal);
-    console.log("phase 最大值:", cv.minMaxLoc(phase).maxVal);
+      // phase单纯对称, 注意不是反对称
+      cv.flip(mat_phaseHalf, mat_phaseHalf, -1);
 
-    // 交换象限回到原始位置
-    quadrantSwap(mag);
-    quadrantSwap(phase);
+      let mat_magHalfFlip = mat_magHalf.roi(new cv.Rect(0, 0, half, height)).clone();
+      cv.flip(mat_magHalfFlip, mat_magHalfFlip, -1);
 
-    // 计算实部和虚部
-    let real = new cv.Mat(height, width, cv.CV_32F);
-    let imag = new cv.Mat(height, width, cv.CV_32F);
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        let magnitude = mag.floatPtr(y, x)[0];
-        let angle = phase.floatPtr(y, x)[0];
-        real.floatPtr(y, x)[0] = magnitude * Math.cos(angle);
-        imag.floatPtr(y, x)[0] = magnitude * Math.sin(angle);
+      let mat_phaseHalfFlip = mat_phaseHalf.roi(new cv.Rect(0, 0, half, height)).clone();
+      cv.flip(mat_phaseHalfFlip, mat_phaseHalfFlip, -1);
+
+      let scalar255 = new cv.Mat(height, half, cv.CV_8U, new cv.Scalar(255));
+      cv.subtract(scalar255, mat_phaseHalfFlip, mat_phaseHalfFlip);
+
+      let matVector_mag = new cv.MatVector();
+      let matVector_phase = new cv.MatVector();
+
+      matVector_mag.push_back(mat_magHalf);
+      matVector_mag.push_back(mat_magHalfFlip);
+      matVector_phase.push_back(mat_phaseHalf);
+      matVector_phase.push_back(mat_phaseHalfFlip);
+
+      let mat_mag = new cv.Mat();
+      let mat_phase = new cv.Mat();
+      cv.hconcat(matVector_mag, mat_mag);
+      cv.hconcat(matVector_phase, mat_phase);
+
+      console.log(`mag: ${cv.minMaxLoc(mat_mag).minVal}~${cv.minMaxLoc(mat_mag).maxVal}`);
+      console.log(`phase: ${cv.minMaxLoc(mat_phase).minVal}~${cv.minMaxLoc(mat_phase).maxVal}`);
+      // downloadMatAsImage(mat_mag, "mat_mag2.png")
+      downloadMatAsImage(mat_phase, "mat_phase2.png")
+
+      // mag 逆归一化
+      mat_mag.convertTo(mat_mag, cv.CV_32F);
+      let mag_scaleInv = Math.log(Math.pow(2, 32)) / 255.0;
+      cv.multiply(mat_mag, new cv.Mat(height, width, cv.CV_32F, new cv.Scalar(mag_scaleInv)), mat_mag);
+
+      // phase 逆归一化
+      mat_phase.convertTo(mat_phase, cv.CV_32F);
+      let phase_shift = Math.PI;
+      let phase_scaleInv = (2 * Math.PI) / 255.0;
+      cv.multiply(mat_phase, new cv.Mat(height, width, cv.CV_32F, new cv.Scalar(phase_scaleInv)), mat_phase);
+      cv.subtract(mat_phase, new cv.Mat(height, width, cv.CV_32F, new cv.Scalar(phase_shift)), mat_phase);
+
+      console.log(`mag: ${cv.minMaxLoc(mat_mag).minVal}~${cv.minMaxLoc(mat_mag).maxVal}`);
+      console.log(`phase: ${cv.minMaxLoc(mat_phase).minVal}~${cv.minMaxLoc(mat_phase).maxVal}`);
+
+      // 逆对数变换 e^n-1
+      cv.exp(mat_mag, mat_mag);
+      cv.subtract(mat_mag, new cv.Mat.ones(height, width, cv.CV_32F), mat_mag);
+
+      console.log(`mag: ${cv.minMaxLoc(mat_mag).minVal}~${cv.minMaxLoc(mat_mag).maxVal}`);
+      console.log(`phase: ${cv.minMaxLoc(mat_phase).minVal}~${cv.minMaxLoc(mat_phase).maxVal}`);
+
+      // 交换象限
+      quadrantSwap(mat_mag);
+      quadrantSwap(mat_phase);
+
+      // 计算实部和虚部
+      let real = new cv.Mat(height, width, cv.CV_32F);
+      let imag = new cv.Mat(height, width, cv.CV_32F);
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          let magnitude = mat_mag.floatPtr(y, x)[0];
+          let angle = mat_phase.floatPtr(y, x)[0];
+          real.floatPtr(y, x)[0] = magnitude * Math.cos(angle);
+          imag.floatPtr(y, x)[0] = magnitude * Math.sin(angle);
+        }
       }
+
+      // 合并为复数矩阵
+      let planes = new cv.MatVector();
+      planes.push_back(real);
+      planes.push_back(imag);
+      let complex = new cv.Mat();
+      cv.merge(planes, complex);
+
+      // 计算逆DFT
+      let idft = new cv.Mat();
+      cv.dft(complex, idft, cv.DFT_INVERSE | cv.DFT_REAL_OUTPUT | cv.DFT_SCALE);
+
+      // 归一化到0~255
+      cv.normalize(idft, idft, 0, 255, cv.NORM_MINMAX);
+      idft.convertTo(idft, cv.CV_8U);
+
+      // 将通道合并
+      matVector_output.push_back(idft);
+
+      scalar255.delete();
+      mat_input.delete();
+      mat_mag.delete();
+      mat_magHalf.delete();
+      mat_phase.delete();
+      mat_phaseHalf.delete();
+      real.delete();
+      imag.delete();
+      planes.delete();
+      complex.delete();
+      idft.delete();
     }
 
-    // 合并为复数矩阵
-    let planes = new cv.MatVector();
-    planes.push_back(real);
-    planes.push_back(imag);
-    let complex = new cv.Mat();
-    cv.merge(planes, complex);
-
-    // 计算逆DFT
-    let idft = new cv.Mat();
-    cv.dft(complex, idft, cv.DFT_INVERSE | cv.DFT_REAL_OUTPUT | cv.DFT_SCALE);
-
-    // 归一化到0~255
-    cv.normalize(idft, idft, 0, 255, cv.NORM_MINMAX);
-    idft.convertTo(idft, cv.CV_8U);
+    let mat_output = new cv.Mat();
+    cv.merge(matVector_output, mat_output); // 合并
 
     // 转换回 imageData
-    const imageData = matToImageDataDirect(idft);
+    const imageData_output = mat2imageData(mat_output);
 
-    return imageData;
+    mat_input.delete();
+    mat_inputRGB.delete();
+    matVector_input.delete();
+    matVector_output.delete();
+    mat_output.delete();
+
+    return imageData_output;
   }
 
 
@@ -334,51 +420,119 @@
     let cx = Math.floor(mat.cols / 2);
     let cy = Math.floor(mat.rows / 2);
 
-    let q0 = mat.roi(new cv.Rect(0, 0, cx, cy));         // 左上
-    let q1 = mat.roi(new cv.Rect(cx, 0, cx, cy));        // 右上
-    let q2 = mat.roi(new cv.Rect(0, cy, cx, cy));        // 左下
-    let q3 = mat.roi(new cv.Rect(cx, cy, cx, cy));       // 右下
+    let q0 = mat.roi(new cv.Rect(0, 0, cx, cy)); // 左上
+    let q1 = mat.roi(new cv.Rect(cx, 0, mat.cols - cx, cy)); // 右上
+    let q2 = mat.roi(new cv.Rect(0, cy, cx, mat.rows - cy)); // 左下
+    let q3 = mat.roi(new cv.Rect(cx, cy, mat.cols - cx, mat.rows - cy)); // 右下
 
-    let tmp = new cv.Mat();
+    cv.flip(q0, q0, -1);
+    cv.flip(q1, q1, -1);
+    cv.flip(q2, q2, -1);
+    cv.flip(q3, q3, -1);
 
-    // 交换左上和右下
-    q0.copyTo(tmp);
-    q3.copyTo(q0);
-    tmp.copyTo(q3);
-
-    // 交换右上和左下
-    q1.copyTo(tmp);
-    q2.copyTo(q1);
-    tmp.copyTo(q2);
+    // 清理资源
+    q0.delete();
+    q1.delete();
+    q2.delete();
+    q3.delete();
   }
 
-  function matToImageDataDirect(mat) {
-    let imageData = new ImageData(mat.cols, mat.rows);
-    let data = imageData.data;
-    let matData = mat.data;
 
-    let channels = mat.channels(); // 获取通道数（1 = 灰度，3 = BGR，4 = BGRA）
-    let index = 0;
 
-    for (let i = 0; i < matData.length; i += channels) {
-      if (channels === 1) {
-        // 灰度图：R = G = B = 灰度值
-        let gray = matData[i];
-        data[index] = gray; // R
-        data[index + 1] = gray; // G
-        data[index + 2] = gray; // B
-        data[index + 3] = 255; // A（不透明）
-      } else {
-        // 彩色或带透明通道的图像
-        data[index] = matData[i]; // R
-        data[index + 1] = matData[i + 1] || matData[i]; // G
-        data[index + 2] = matData[i + 2] || matData[i]; // B
-        data[index + 3] = channels === 4 ? matData[i + 3] : 255; // A（如果 Mat 里没有 alpha 通道，就填充 255）
-      }
-      index += 4;
+
+  function symmetrize(mat, isPhase = false) {
+    const height = mat.rows;
+    const width = mat.cols;
+
+    // 获取左上 mask
+    let mask = new cv.Mat.zeros(height, width, cv.CV_8U);
+
+    let points = cv.matFromArray(1, 3, cv.CV_32SC2, [
+      0, 0,              // 左上
+      0, height - 1,     // 左下
+      width - 1, 0       // 右上
+    ]);
+    let pts = new cv.MatVector();
+    pts.push_back(points);
+    cv.fillPoly(mask, pts, new cv.Scalar(255));
+
+    // 创建翻转后的图像
+    let flipped = new cv.Mat();
+    cv.flip(mat, flipped, -1);
+
+    // 如果反对称
+    if (isPhase) {
+      let zeros = new cv.Mat.zeros(height, width, mat.type());
+      cv.subtract(zeros, flipped, flipped);
     }
 
-    return imageData;
+    // 覆盖左上三角部分
+    mat.copyTo(flipped, mask);
+    // new cv.Mat.zeros(height, width, mat.type()).copyTo(flipped, mask);
+    return flipped;
+  }
+
+
+
+  function downloadMatAsImage(mat, filename = 'mat.png') {
+    let imgData = mat2imageData(mat);
+
+    // 绘制到 Canvas 并下载
+    let canvas = document.createElement('canvas');
+    canvas.width = mat.cols;
+    canvas.height = mat.rows;
+    let ctx = canvas.getContext('2d');
+    ctx.putImageData(imgData, 0, 0);
+    canvas.toBlob((blob) => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+  }
+
+
+
+
+
+  function mat2imageData(mat) {
+    let matDisplay = new cv.Mat();
+
+    // 如果不是 CV_8U，则归一化并转成 CV_8U
+    if (mat.type() !== cv.CV_8UC1 && mat.type() !== cv.CV_8UC3 && mat.type() !== cv.CV_8UC4) {
+      cv.normalize(mat, matDisplay, 0, 255, cv.NORM_MINMAX);
+      matDisplay.convertTo(matDisplay, cv.CV_8U);
+    } else {
+      mat.copyTo(matDisplay);
+    }
+
+    // 确保是 RGBA 格式用于 ImageData
+    let matRGBA = new cv.Mat();
+    if (matDisplay.channels() === 1) {
+      cv.cvtColor(matDisplay, matRGBA, cv.COLOR_GRAY2RGBA);
+    } else if (matDisplay.channels() === 3) {
+      cv.cvtColor(matDisplay, matRGBA, cv.COLOR_RGB2RGBA);
+    } else if (matDisplay.channels() === 4) {
+      matDisplay.copyTo(matRGBA);
+    } else {
+      console.error("Unsupported number of channels:", matDisplay.channels());
+      matDisplay.delete();
+      return;
+    }
+
+    // 创建 ImageData
+    let imgData = new ImageData(
+      new Uint8ClampedArray(matRGBA.data),
+      matRGBA.cols,
+      matRGBA.rows
+    );
+
+    // 释放资源
+    matDisplay.delete();
+    matRGBA.delete();
+
+    return imgData;
   }
 
 </script>

@@ -146,7 +146,7 @@
     let matVector_mag = new cv.MatVector();
     let matVector_phase = new cv.MatVector();
     for (let i = 0; i < matVector_input.size(); i++) { // 对每个通道分别进行 DFT
-    // for (let i = 0; i < 1; i++) { // 对R通道分别进行 DFT
+      // for (let i = 0; i < 1; i++) { // 对R通道分别进行 DFT
       // 转换为浮点数
       let mat_inputFloat = new cv.Mat();
       matVector_input.get(i).convertTo(mat_inputFloat, cv.CV_32F);
@@ -242,10 +242,19 @@
     cv.merge(matVector_mag, mat_magRGB); // 合并幅度谱
     cv.merge(matVector_phase, mat_phaseRGB); // 合并相位谱
 
+    // 裁剪 mag phase 左半
+    const half = Math.floor(width / 2);
+    const evenHeight = height - height % 2;
+    let mat_magRGBHalf = mat_magRGB.roi(new cv.Rect(0, 0, half, evenHeight));
+    let mat_phaseRGBHalf = mat_phaseRGB.roi(new cv.Rect(0, 0, half, evenHeight)).clone();
+
+    // phase单纯对称, 注意不是反对称
+    cv.flip(mat_phaseRGBHalf, mat_phaseRGBHalf, -1);
+
     // 拼接图像
     let matVector_Half = new cv.MatVector();
-    matVector_Half.push_back(mat_magRGB);
-    matVector_Half.push_back(mat_phaseRGB);
+    matVector_Half.push_back(mat_magRGBHalf);
+    matVector_Half.push_back(mat_phaseRGBHalf);
 
     let mat_output = new cv.Mat();
     cv.hconcat(matVector_Half, mat_output);
@@ -272,7 +281,7 @@
   // IDFT
 
   function imageDataIdft(imageData) {
-    const { width: totalWidth, height } = imageData;
+    const { width, height } = imageData;
 
     // 转换为 Mat
     let mat_input = cv.matFromImageData(imageData);
@@ -287,15 +296,47 @@
 
     let matVector_output = new cv.MatVector();
     for (let i = 0; i < matVector_input.size(); i++) { // 对每个通道分别进行 IDFT
-    // for (let i = 0; i < 1; i++) { // 对R通道分别进行 IDFT
+      // for (let i = 0; i < 1; i++) { // 对R通道分别进行 IDFT
       let mat_input = new cv.Mat();
       matVector_input.get(i).convertTo(mat_input, cv.CV_32F);
 
-      // 提取 mag phase
-      const width = Math.floor(totalWidth / 2);
 
-      let mat_mag = mat_input.roi(new cv.Rect(0, 0, width, height)).clone();
-      let mat_phase = mat_input.roi(new cv.Rect(width, 0, width, height)).clone();
+
+
+
+
+
+
+      // 提取 mag phase
+      const half = Math.floor(width / 2);
+
+      let mat_magHalf = mat_input.roi(new cv.Rect(0, 0, half, height)).clone();
+      let mat_phaseHalf = mat_input.roi(new cv.Rect(half, 0, half, height)).clone();
+
+      // phase单纯对称, 注意不是反对称
+      cv.flip(mat_phaseHalf, mat_phaseHalf, -1);
+
+      let mat_magHalfFlip = mat_magHalf.roi(new cv.Rect(0, 0, half, height)).clone();
+      cv.flip(mat_magHalfFlip, mat_magHalfFlip, -1);
+
+      let mat_phaseHalfFlip = mat_phaseHalf.roi(new cv.Rect(0, 0, half, height)).clone();
+      cv.flip(mat_phaseHalfFlip, mat_phaseHalfFlip, -1);
+
+      let scalar255 = new cv.Mat(height, half, cv.CV_32F, new cv.Scalar(255));
+      cv.subtract(scalar255, mat_phaseHalfFlip, mat_phaseHalfFlip);
+
+      let matVector_mag = new cv.MatVector();
+      let matVector_phase = new cv.MatVector();
+
+      matVector_mag.push_back(mat_magHalf);
+      matVector_mag.push_back(mat_magHalfFlip);
+      matVector_phase.push_back(mat_phaseHalf);
+      matVector_phase.push_back(mat_phaseHalfFlip);
+
+      let mat_mag = new cv.Mat();
+      let mat_phase = new cv.Mat();
+      cv.hconcat(matVector_mag, mat_mag);
+      cv.hconcat(matVector_phase, mat_phase);
 
       console.log(`mag: ${cv.minMaxLoc(mat_mag).minVal}~${cv.minMaxLoc(mat_mag).maxVal}`);
       console.log(`phase: ${cv.minMaxLoc(mat_phase).minVal}~${cv.minMaxLoc(mat_phase).maxVal}`);

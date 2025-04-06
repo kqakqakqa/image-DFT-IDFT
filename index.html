@@ -145,8 +145,8 @@
 
     let matVector_mag = new cv.MatVector();
     let matVector_phase = new cv.MatVector();
-    // for (let i = 0; i < matVector_input.size(); i++) { // 对每个通道分别进行 DFT
-    for (let i = 0; i < 1; i++) { // 对R通道分别进行 DFT
+    for (let i = 0; i < matVector_input.size(); i++) { // 对每个通道分别进行 DFT
+    // for (let i = 0; i < 1; i++) { // 对R通道分别进行 DFT
       // 转换为浮点数
       let mat_inputFloat = new cv.Mat();
       matVector_input.get(i).convertTo(mat_inputFloat, cv.CV_32F);
@@ -181,12 +181,12 @@
         }
       }
 
-      mat_mag = symmetrize(mat_mag); // 对称化幅度谱
-      mat_phase = symmetrize(mat_phase, true); // 反对称化相位谱
+      // mat_mag = symmetrize(mat_mag); // 对称化幅度谱
+      // mat_phase = symmetrize(mat_phase, true); // 反对称化相位谱
 
       // 交换象限
-      // quadrantSwap(mat_mag);
-      // quadrantSwap(mat_phase);
+      quadrantSwap(mat_mag);
+      quadrantSwap(mat_phase);
 
       console.log(`mag: ${cv.minMaxLoc(mat_mag).minVal}~${cv.minMaxLoc(mat_mag).maxVal}`);
       console.log(`phase: ${cv.minMaxLoc(mat_phase).minVal}~${cv.minMaxLoc(mat_phase).maxVal}`);
@@ -286,8 +286,8 @@
     cv.split(mat_inputRGB, matVector_input);
 
     let matVector_output = new cv.MatVector();
-    // for (let i = 0; i < matVector_input.size(); i++) { // 对每个通道分别进行 IDFT
-    for (let i = 0; i < 1; i++) { // 对R通道分别进行 IDFT
+    for (let i = 0; i < matVector_input.size(); i++) { // 对每个通道分别进行 IDFT
+    // for (let i = 0; i < 1; i++) { // 对R通道分别进行 IDFT
       let mat_input = new cv.Mat();
       matVector_input.get(i).convertTo(mat_input, cv.CV_32F);
 
@@ -327,8 +327,8 @@
       console.log(`phase: ${cv.minMaxLoc(mat_phase).minVal}~${cv.minMaxLoc(mat_phase).maxVal}`);
 
       // 交换象限
-      // quadrantSwap(mat_mag);
-      // quadrantSwap(mat_phase);
+      quadrantSwap(mat_mag);
+      quadrantSwap(mat_phase);
 
       // 计算实部和虚部
       let real = new cv.Mat(height, width, cv.CV_32F);
@@ -354,7 +354,7 @@
       cv.dft(complex, idft, cv.DFT_INVERSE | cv.DFT_REAL_OUTPUT | cv.DFT_SCALE);
 
       // 归一化到0~255
-      cv.normalize(idft, idft, 0, 255, cv.NORM_MINMAX);
+      // cv.normalize(idft, idft, 0, 255, cv.NORM_MINMAX);
       idft.convertTo(idft, cv.CV_8U);
 
       // 将通道合并
